@@ -1,1 +1,6 @@
-// Flows will be imported for their side effects in this file.
+import { config } from 'dotenv';
+config();
+
+import '@/ai/flows/generate-7s-analysis.ts';
+import '@/ai/flows/refine-7s-analysis.ts';
+import '@/ai/flows/prompt-from-template.ts';
