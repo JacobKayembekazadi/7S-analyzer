@@ -49,7 +49,7 @@ export default function Sidebar() {
                 >
                 <CheckSquare className="h-5 w-5" />
                 <span className="sr-only">SWOT Analysis</span>
-                </a >
+                </Link>
             </TooltipTrigger>
             <TooltipContent side="right">SWOT Analysis</TooltipContent>
             </Tooltip>
@@ -61,7 +61,7 @@ export default function Sidebar() {
                 >
                 <CheckSquare className="h-5 w-5" />
                 <span className="sr-only">Action Plan</span>
-                </a >
+                </Link>
             </TooltipTrigger>
             <TooltipContent side="right">Action Plan</TooltipContent>
             </Tooltip>
