@@ -1,8 +1,9 @@
+
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Info, Loader2, Sparkles, Lightbulb, ListChecks, Target, PlusCircle, Trash2 } from "lucide-react";
-import { useState } from "react";
+import * as React from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { PolarAngleAxis, PolarGrid, Radar, RadarChart } from "recharts";
@@ -84,9 +85,9 @@ const S_ELEMENTS: {
 export default function SevenSAnalysisPage() {
   const router = useRouter();
   const { analysisResult, setAnalysisResult, addGoal } = useStore();
-  const [isLoading, setIsLoading] = useState(false);
-  const [isRefining, setIsRefining] = useState(false);
-  const [feedback, setFeedback] = useState("");
+  const [isLoading, setIsLoading] = React.useState(false);
+  const [isRefining, setIsRefining] = React.useState(false);
+  const [feedback, setFeedback] = React.useState("");
   const { toast } = useToast();
 
   const sevenSForm = useForm<z.infer<typeof sevenSFormSchema>>({
@@ -296,7 +297,7 @@ export default function SevenSAnalysisPage() {
                                             id: `goal_${Date.now()}`,
                                             title: rec.recommendation,
                                             priority: rec.priority,
-                                            actions: [{ id: `action_${Date.now()}`, task: "", completed: false }],
+                                            actions: [],
                                         });
                                         toast({
                                             title: "Goal Added",

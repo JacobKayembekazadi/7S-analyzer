@@ -1,3 +1,4 @@
+
 "use client";
 
 import * as React from "react";
@@ -109,27 +110,33 @@ export default function ActionPlanPage() {
                                 <Badge variant={goal.priority === 'High' ? 'destructive' : 'secondary'} className="w-min">{goal.priority} Priority</Badge>
                             </CardHeader>
                             <CardContent className="space-y-3">
-                                {goal.actions.map((action, actionIndex) => (
-                                <div key={action.id} className="flex items-center gap-2">
-                                    <FormField
-                                    control={actionPlanForm.control}
-                                    name={`goals.${goalIndex}.actions.${actionIndex}.completed`}
-                                    render={({ field }) => (
-                                        <Checkbox checked={field.value} onCheckedChange={field.onChange} />
-                                    )}
-                                    />
-                                    <FormField
-                                    control={actionPlanForm.control}
-                                    name={`goals.${goalIndex}.actions.${actionIndex}.task`}
-                                    render={({ field }) => (
-                                    <Input {...field} placeholder="Describe the action item..." className="flex-grow" />
-                                    )}
-                                    />
-                                    <Button variant="ghost" size="icon" onClick={() => removeActionItem(goalIndex, actionIndex)}>
-                                    <Trash2 className="h-4 w-4 text-muted-foreground" />
-                                    </Button>
-                                </div>
-                                ))}
+                                {goal.actions.length > 0 ? (
+                                    goal.actions.map((action, actionIndex) => (
+                                    <div key={action.id} className="flex items-center gap-2">
+                                        <FormField
+                                        control={actionPlanForm.control}
+                                        name={`goals.${goalIndex}.actions.${actionIndex}.completed`}
+                                        render={({ field }) => (
+                                            <Checkbox checked={field.value} onCheckedChange={field.onChange} />
+                                        )}
+                                        />
+                                        <FormField
+                                        control={actionPlanForm.control}
+                                        name={`goals.${goalIndex}.actions.${actionIndex}.task`}
+                                        render={({ field }) => (
+                                        <Input {...field} placeholder="Describe the action item..." className="flex-grow" />
+                                        )}
+                                        />
+                                        <Button variant="ghost" size="icon" onClick={() => removeActionItem(goalIndex, actionIndex)}>
+                                        <Trash2 className="h-4 w-4 text-muted-foreground" />
+                                        </Button>
+                                    </div>
+                                    ))
+                                ) : (
+                                    <div className="text-center text-sm text-muted-foreground py-4">
+                                        No action items yet. Click below to add the first step.
+                                    </div>
+                                )}
                                 <Button type="button" variant="outline" size="sm" onClick={() => addActionItem(goalIndex)}>
                                     <PlusCircle className="mr-2 h-4 w-4" /> Add Action Item
                                 </Button>
