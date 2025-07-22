@@ -6,6 +6,11 @@ import {
   Generate7SAnalysisOutput,
 } from "@/ai/flows/generate-7s-analysis";
 import {
+  generateSwotAnalysis as generateSwotAnalysisFlow,
+  GenerateSwotAnalysisInput,
+  GenerateSwotAnalysisOutput,
+} from "@/ai/flows/generate-swot-analysis";
+import {
   promptFromTemplate,
   PromptFromTemplateInput,
   PromptFromTemplateOutput,
@@ -32,4 +37,10 @@ export async function getTemplate(
   input: PromptFromTemplateInput
 ): Promise<PromptFromTemplateOutput> {
   return await promptFromTemplate(input);
+}
+
+export async function generateSwotAnalysis(
+  input: GenerateSwotAnalysisInput
+): Promise<GenerateSwotAnalysisOutput> {
+  return await generateSwotAnalysisFlow(input);
 }

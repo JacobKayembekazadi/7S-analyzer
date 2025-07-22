@@ -9,3 +9,10 @@ export type SevenSElements = {
   staff: string;
   skills: string;
 };
+
+export type SwotElements = {
+  strengths: string;
+  weaknesses: string;
+  opportunities: string;
+  threats: string;
+};
