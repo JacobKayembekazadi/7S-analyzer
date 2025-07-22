@@ -12,16 +12,18 @@ const parseMarkdown = (markdown: string): React.ReactNode[] => {
   const elements: React.ReactNode[] = [];
   let listType: "ul" | "ol" | null = null;
   let listItems: React.ReactNode[] = [];
+  let listKey: number | null = null;
 
   const flushList = () => {
-    if (listItems.length > 0) {
+    if (listItems.length > 0 && listKey !== null) {
       if (listType === "ul") {
-        elements.push(<ul key={elements.length} className="list-disc pl-5 space-y-1">{listItems}</ul>);
+        elements.push(<ul key={`list-${listKey}`} className="list-disc pl-5 space-y-1">{listItems}</ul>);
       } else if (listType === "ol") {
-        elements.push(<ol key={elements.length} className="list-decimal pl-5 space-y-1">{listItems}</ol>);
+        elements.push(<ol key={`list-${listKey}`} className="list-decimal pl-5 space-y-1">{listItems}</ol>);
       }
       listItems = [];
       listType = null;
+      listKey = null;
     }
   };
 
@@ -48,6 +50,7 @@ const parseMarkdown = (markdown: string): React.ReactNode[] => {
       if (listType !== "ul") {
         flushList();
         listType = "ul";
+        listKey = index;
       }
       const itemContent = line.substring(2).replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>");
       listItems.push(<li key={index} dangerouslySetInnerHTML={{ __html: itemContent }}></li>);
@@ -59,6 +62,7 @@ const parseMarkdown = (markdown: string): React.ReactNode[] => {
         if (listType !== 'ol') {
             flushList();
             listType = 'ol';
+            listKey = index;
         }
         const itemContent = line.replace(/^\d+\.\s/, '').replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
         listItems.push(<li key={index} dangerouslySetInnerHTML={{ __html: itemContent }}></li>);
@@ -69,7 +73,9 @@ const parseMarkdown = (markdown: string): React.ReactNode[] => {
 
     // Paragraphs and bold text
     if (line.trim() === "") {
-      elements.push(<br key={index} />);
+       if (elements.length > 0 && elements[elements.length - 1]?.type !== 'br') {
+        elements.push(<br key={index} />);
+      }
     } else {
       const paragraphContent = line.replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>");
       elements.push(<p key={index} dangerouslySetInnerHTML={{ __html: paragraphContent }}></p>);
