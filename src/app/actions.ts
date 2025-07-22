@@ -11,6 +11,11 @@ import {
   GenerateSwotAnalysisOutput,
 } from "@/ai/flows/generate-swot-analysis";
 import {
+  generateTownHallSpeech as generateTownHallSpeechFlow,
+  GenerateTownHallSpeechInput,
+  GenerateTownHallSpeechOutput,
+} from "@/ai/flows/generate-town-hall";
+import {
   promptFromTemplate,
   PromptFromTemplateInput,
   PromptFromTemplateOutput,
@@ -43,4 +48,10 @@ export async function generateSwotAnalysis(
   input: GenerateSwotAnalysisInput
 ): Promise<GenerateSwotAnalysisOutput> {
   return await generateSwotAnalysisFlow(input);
+}
+
+export async function generateTownHallSpeech(
+  input: GenerateTownHallSpeechInput
+): Promise<GenerateTownHallSpeechOutput> {
+  return await generateTownHallSpeechFlow(input);
 }

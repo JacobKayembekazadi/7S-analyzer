@@ -1,14 +1,14 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Award, Info, Lightbulb, ListChecks, Loader2, Sparkles, Target, Shield, Skull, Telescope, Wind } from "lucide-react";
+import { Award, Info, Lightbulb, ListChecks, Loader2, Mic, Sparkles, Target, Shield, Skull, Telescope, Wind } from "lucide-react";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { PolarAngleAxis, PolarGrid, Radar, RadarChart } from "recharts";
 
 
-import { generateAnalysis, getTemplate, refineAnalysis, generateSwotAnalysis } from "@/app/actions";
+import { generateAnalysis, getTemplate, refineAnalysis, generateSwotAnalysis, generateTownHallSpeech } from "@/app/actions";
 import { Markdown } from "@/components/markdown";
 import {
   Accordion,
@@ -34,6 +34,7 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
 import {
   Select,
   SelectContent,
@@ -52,6 +53,7 @@ import {
 } from "@/components/ui/tooltip";
 import { useToast } from "@/hooks/use-toast";
 import type { Generate7SAnalysisOutput } from "@/ai/flows/generate-7s-analysis";
+import type { GenerateTownHallSpeechOutput } from "@/ai/flows/generate-town-hall";
 import type { SevenSElements, SwotElements } from "@/lib/types";
 import { GenerateSwotAnalysisOutput } from "@/ai/flows/generate-swot-analysis";
 
@@ -102,9 +104,12 @@ const SWOT_ELEMENTS: {
 export default function Home() {
   const [analysisResult, setAnalysisResult] = useState<Generate7SAnalysisOutput | null>(null);
   const [swotResult, setSwotResult] = useState<GenerateSwotAnalysisOutput | null>(null);
+  const [townHallSpeech, setTownHallSpeech] = useState<GenerateTownHallSpeechOutput | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isRefining, setIsRefining] = useState(false);
+  const [isGeneratingSpeech, setIsGeneratingSpeech] = useState(false);
   const [feedback, setFeedback] = useState("");
+  const [companyName, setCompanyName] = useState("");
   const { toast } = useToast();
 
   const sevenSForm = useForm<z.infer<typeof sevenSFormSchema>>({
@@ -153,6 +158,8 @@ export default function Home() {
   const on7sSubmit = async (values: z.infer<typeof sevenSFormSchema>) => {
     setIsLoading(true);
     setAnalysisResult(null);
+    setSwotResult(null);
+    setTownHallSpeech(null);
     try {
       const result = await generateAnalysis(values);
       setAnalysisResult(result);
@@ -171,6 +178,8 @@ export default function Home() {
   const onSwotSubmit = async (values: z.infer<typeof swotFormSchema>) => {
     setIsLoading(true);
     setSwotResult(null);
+    setAnalysisResult(null);
+    setTownHallSpeech(null);
     try {
       const result = await generateSwotAnalysis(values);
       setSwotResult(result);
@@ -185,7 +194,6 @@ export default function Home() {
       setIsLoading(false);
     }
   };
-
 
   const handleRefine = async () => {
     if (!analysisResult || !feedback) return;
@@ -207,6 +215,33 @@ export default function Home() {
       });
     } finally {
       setIsRefining(false);
+    }
+  };
+  
+  const handleGenerateSpeech = async () => {
+    if (!swotResult || !companyName) {
+       toast({
+        variant: "destructive",
+        title: "Missing Information",
+        description: "Please enter a company name before generating a speech.",
+      });
+      return;
+    };
+    setIsGeneratingSpeech(true);
+    try {
+      const result = await generateTownHallSpeech({
+        analysis: swotResult.analysis,
+        companyName: companyName,
+      });
+      setTownHallSpeech(result);
+    } catch (error) {
+       toast({
+        variant: "destructive",
+        title: "Speech Generation Failed",
+        description: "The AI could not generate the speech. Please try again.",
+      });
+    } finally {
+      setIsGeneratingSpeech(false);
     }
   };
 
@@ -300,7 +335,7 @@ export default function Home() {
                     </Accordion>
 
                     <Button type="submit" size="lg" className="w-full" disabled={isLoading}>
-                      {isLoading ? (
+                      {isLoading && !isRefining ? (
                         <>
                           <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                           Analyzing...
@@ -360,7 +395,7 @@ export default function Home() {
                     </div>
 
                     <Button type="submit" size="lg" className="w-full" disabled={isLoading}>
-                      {isLoading ? (
+                      {isLoading && !isRefining ? (
                         <>
                           <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                           Generating SWOT...
@@ -473,14 +508,48 @@ export default function Home() {
                   </Tabs>
                 ) : swotResult ? (
                   <Tabs defaultValue="swot-analysis" className="w-full">
-                    <TabsList>
+                    <TabsList className="grid w-full grid-cols-2">
                       <TabsTrigger value="swot-analysis">SWOT Analysis</TabsTrigger>
+                      {townHallSpeech && <TabsTrigger value="town-hall">Town Hall Speech</TabsTrigger>}
                     </TabsList>
                     <TabsContent value="swot-analysis" className="mt-4">
                        <div className="prose prose-sm max-w-none rounded-md border bg-background/50 p-4 max-h-[550px] overflow-y-auto">
                           <Markdown content={swotResult.analysis} />
                       </div>
+                       <Card className="mt-6">
+                        <CardHeader>
+                          <CardTitle className="flex items-center gap-2"><Mic /> Generate Town Hall Speech</CardTitle>
+                          <CardDescription>
+                            Turn this SWOT analysis into a compelling speech for your team. Enter your company name to begin.
+                          </CardDescription>
+                        </CardHeader>
+                        <CardContent className="flex flex-col gap-4">
+                           <Input 
+                            placeholder="Your Company Name"
+                            value={companyName}
+                            onChange={(e) => setCompanyName(e.target.value)}
+                            disabled={isGeneratingSpeech}
+                          />
+                          <Button onClick={handleGenerateSpeech} disabled={isGeneratingSpeech || !companyName}>
+                            {isGeneratingSpeech ? (
+                              <>
+                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                Generating...
+                              </>
+                            ) : (
+                              "Generate Speech"
+                            )}
+                          </Button>
+                        </CardContent>
+                      </Card>
                     </TabsContent>
+                     {townHallSpeech && (
+                      <TabsContent value="town-hall" className="mt-4">
+                         <div className="prose prose-sm max-w-none rounded-md border bg-background/50 p-4 max-h-[550px] overflow-y-auto">
+                            <Markdown content={townHallSpeech.speech} />
+                        </div>
+                      </TabsContent>
+                    )}
                   </Tabs>
                 ) : (
                   <div className="flex h-full min-h-[400px] flex-col items-center justify-center rounded-md border-2 border-dashed bg-muted/50 p-8 text-center">
