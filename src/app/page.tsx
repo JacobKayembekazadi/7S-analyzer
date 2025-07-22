@@ -1,10 +1,12 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Info, Loader2, Sparkles } from "lucide-react";
+import { Award, Info, Lightbulb, ListChecks, Loader2, Sparkles, Target } from "lucide-react";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
+import { PolarAngleAxis, PolarGrid, Radar, RadarChart } from "recharts";
+
 
 import { generateAnalysis, getTemplate, refineAnalysis } from "@/app/actions";
 import { Markdown } from "@/components/markdown";
@@ -14,6 +16,7 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -22,6 +25,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
 import {
   Form,
   FormControl,
@@ -38,6 +42,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import {
   Tooltip,
@@ -46,6 +51,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { useToast } from "@/hooks/use-toast";
+import type { Generate7SAnalysisOutput } from "@/ai/flows/generate-7s-analysis";
 import type { SevenSElements } from "@/lib/types";
 
 const formSchema = z.object({
@@ -73,7 +79,7 @@ const S_ELEMENTS: {
 ];
 
 export default function Home() {
-  const [analysis, setAnalysis] = useState<string | null>(null);
+  const [analysisResult, setAnalysisResult] = useState<Generate7SAnalysisOutput | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isRefining, setIsRefining] = useState(false);
   const [feedback, setFeedback] = useState("");
@@ -113,15 +119,16 @@ export default function Home() {
 
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
     setIsLoading(true);
-    setAnalysis(null);
+    setAnalysisResult(null);
     try {
       const result = await generateAnalysis(values);
-      setAnalysis(result.analysis);
+      setAnalysisResult(result);
     } catch (error) {
+      console.error(error);
       toast({
         variant: "destructive",
         title: "Analysis Failed",
-        description: "The AI could not generate an analysis. Please try again.",
+        description: "The AI could not generate an analysis. Please check the console for errors and try again.",
       });
     } finally {
       setIsLoading(false);
@@ -129,11 +136,16 @@ export default function Home() {
   };
 
   const handleRefine = async () => {
-    if (!analysis || !feedback) return;
+    if (!analysisResult || !feedback) return;
     setIsRefining(true);
     try {
-      const result = await refineAnalysis({ analysis, feedback });
-      setAnalysis(result.refinedAnalysis);
+      const result = await refineAnalysis({ 
+        analysis: analysisResult.analysis,
+        recommendations: analysisResult.recommendations,
+        chartData: analysisResult.chartData,
+        feedback
+      });
+      setAnalysisResult(result);
       setFeedback("");
     } catch (error) {
       toast({
@@ -146,35 +158,51 @@ export default function Home() {
     }
   };
 
+  const priorityIcon = (priority: 'High' | 'Medium' | 'Low') => {
+    switch (priority) {
+      case 'High': return <Target className="text-red-500" />;
+      case 'Medium': return <Lightbulb className="text-yellow-500" />;
+      case 'Low': return <ListChecks className="text-blue-500" />;
+      default: return null;
+    }
+  };
+
 
   return (
     <TooltipProvider>
       <div className="min-h-screen w-full bg-background">
-        <main className="container mx-auto grid grid-cols-1 gap-12 px-4 py-8 md:grid-cols-2 lg:grid-cols-5">
-          <div className="lg:col-span-3">
+        <main className="container mx-auto grid grid-cols-1 gap-12 px-4 py-8 lg:grid-cols-5">
+          <div className="lg:col-span-2">
             <header className="mb-8">
-              <h1 className="font-headline text-4xl font-bold tracking-tight text-foreground">7S Analyzer</h1>
+              <h1 className="font-headline text-4xl font-bold tracking-tight text-foreground">Strategic Alignment OS</h1>
               <p className="mt-2 text-lg text-muted-foreground">
-                Assess your organization's alignment with the McKinsey 7S framework.
+                Transform your organization with AI-driven insights from the 7-S framework.
               </p>
             </header>
 
-            <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center">
-                <p className="text-sm font-medium">Load a template:</p>
-                <Select onValueChange={handleTemplateChange} disabled={isLoading}>
-                    <SelectTrigger className="w-full sm:w-[240px]">
-                        <SelectValue placeholder="Select an example" />
-                    </SelectTrigger>
-                    <SelectContent>
-                        <SelectItem value="tech-startup">Tech Startup</SelectItem>
-                        <SelectItem value="traditional-manufacturing">Traditional Manufacturing</SelectItem>
-                        <SelectItem value="non-profit">Non-Profit</SelectItem>
-                    </SelectContent>
-                </Select>
-            </div>
+            <Card>
+              <CardHeader>
+                  <CardTitle>Load an Example</CardTitle>
+                  <CardDescription>
+                      Select an industry template to see how it works.
+                  </CardDescription>
+              </CardHeader>
+              <CardContent>
+                  <Select onValueChange={handleTemplateChange} disabled={isLoading}>
+                      <SelectTrigger>
+                          <SelectValue placeholder="Select a business type" />
+                      </SelectTrigger>
+                      <SelectContent>
+                          <SelectItem value="tech-startup">Tech Startup</SelectItem>
+                          <SelectItem value="traditional-manufacturing">Traditional Manufacturing</SelectItem>
+                          <SelectItem value="non-profit">Non-Profit</SelectItem>
+                      </SelectContent>
+                  </Select>
+              </CardContent>
+            </Card>
 
             <Form {...form}>
-              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+              <form onSubmit={form.handleSubmit(onSubmit)} className="mt-8 space-y-4">
                 <Accordion type="single" collapsible className="w-full" defaultValue="strategy">
                   {S_ELEMENTS.map(({ key, label, tooltip }) => (
                     <AccordionItem value={key} key={key}>
@@ -231,28 +259,78 @@ export default function Home() {
             </Form>
           </div>
 
-          <aside className="lg:col-span-2">
+          <aside className="lg:col-span-3">
             <Card className="sticky top-8 shadow-lg">
               <CardHeader>
-                <CardTitle className="font-headline text-2xl">AI Analysis</CardTitle>
+                <CardTitle className="font-headline text-2xl">Your Strategic Blueprint</CardTitle>
                 <CardDescription>
-                  Review the AI-generated alignment analysis below.
+                  AI-generated insights to drive your business forward.
                 </CardDescription>
               </CardHeader>
-              <CardContent className="min-h-[400px]">
+              <CardContent className="min-h-[600px]">
                 {isLoading ? (
-                  <div className="space-y-4">
+                  <div className="space-y-4 pt-4">
+                    <Skeleton className="h-8 w-1/3" />
                     <Skeleton className="h-4 w-3/4" />
                     <Skeleton className="h-4 w-full" />
                     <Skeleton className="h-4 w-5/6" />
-                    <Skeleton className="h-4 w-full" />
-                  </div>
-                ) : analysis ? (
-                  <>
-                    <div className="prose prose-sm max-w-none rounded-md border bg-background/50 p-4">
-                        <Markdown content={analysis} />
+                    <div className="h-64 w-full pt-8">
+                      <Skeleton className="h-full w-full rounded-full" />
                     </div>
-                    <div className="mt-6">
+                  </div>
+                ) : analysisResult ? (
+                  <Tabs defaultValue="recommendations" className="w-full">
+                    <TabsList className="grid w-full grid-cols-3">
+                      <TabsTrigger value="recommendations">Recommendations</TabsTrigger>
+                      <TabsTrigger value="analysis">Full Analysis</TabsTrigger>
+                      <TabsTrigger value="chart">Alignment Chart</TabsTrigger>
+                    </TabsList>
+                    <TabsContent value="recommendations" className="mt-6">
+                       <div className="space-y-4">
+                         {analysisResult.recommendations.map((rec, index) => (
+                           <Card key={index} className="bg-background/50">
+                             <CardHeader className="flex flex-row items-start gap-4 space-y-0 p-4">
+                                <div className="mt-1">{priorityIcon(rec.priority)}</div>
+                                <div>
+                                  <div className="flex items-center gap-2">
+                                     <p className="font-semibold">{rec.recommendation}</p>
+                                  </div>
+                                  <Badge variant={rec.priority === 'High' ? 'destructive' : 'secondary'} className="mt-2">{rec.priority} Priority</Badge>
+                                </div>
+                             </CardHeader>
+                           </Card>
+                         ))}
+                       </div>
+                    </TabsContent>
+                    <TabsContent value="analysis" className="mt-4">
+                      <div className="prose prose-sm max-w-none rounded-md border bg-background/50 p-4 max-h-[450px] overflow-y-auto">
+                          <Markdown content={analysisResult.analysis} />
+                      </div>
+                    </TabsContent>
+                    <TabsContent value="chart" className="mt-4">
+                        <ChartContainer
+                          config={{
+                            score: {
+                              label: "Score",
+                              color: "hsl(var(--primary))",
+                            },
+                          }}
+                          className="mx-auto aspect-square h-[350px]"
+                        >
+                          <RadarChart data={analysisResult.chartData}>
+                            <ChartTooltip cursor={false} content={<ChartTooltipContent indicator="line" />} />
+                            <PolarAngleAxis dataKey="name" />
+                            <PolarGrid />
+                            <Radar
+                              dataKey="score"
+                              fill="hsl(var(--primary))"
+                              fillOpacity={0.6}
+                              stroke="hsl(var(--primary))"
+                            />
+                          </RadarChart>
+                        </ChartContainer>
+                    </TabsContent>
+                    <div className="mt-6 border-t pt-6">
                         <h3 className="text-lg font-semibold mb-2">Refine Analysis</h3>
                         <Textarea 
                             placeholder="Provide feedback to improve the analysis. For example, 'Focus more on the disconnect between strategy and skills.'"
@@ -272,12 +350,12 @@ export default function Home() {
                             )}
                         </Button>
                     </div>
-                  </>
+                  </Tabs>
                 ) : (
-                  <div className="flex h-full min-h-[200px] flex-col items-center justify-center rounded-md border-2 border-dashed bg-muted/50 p-8 text-center">
-                    <Sparkles className="h-10 w-10 text-muted-foreground" />
-                    <p className="mt-4 text-muted-foreground">
-                      Your analysis will appear here once generated.
+                  <div className="flex h-full min-h-[400px] flex-col items-center justify-center rounded-md border-2 border-dashed bg-muted/50 p-8 text-center">
+                    <Award className="h-12 w-12 text-muted-foreground" />
+                    <p className="mt-4 max-w-sm text-center text-muted-foreground">
+                      Your personalized strategic blueprint will appear here once you provide your organizational details.
                     </p>
                   </div>
                 )}

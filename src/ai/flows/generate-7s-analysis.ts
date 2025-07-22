@@ -23,6 +23,14 @@ export type Generate7SAnalysisInput = z.infer<typeof Generate7SAnalysisInputSche
 
 const Generate7SAnalysisOutputSchema = z.object({
   analysis: z.string().describe('AI-generated analysis of the alignment between the seven elements, in markdown format.'),
+  recommendations: z.array(z.object({
+    recommendation: z.string().describe("A specific, actionable recommendation for improvement."),
+    priority: z.enum(["High", "Medium", "Low"]).describe("The priority of the recommendation."),
+  })).describe("A list of actionable recommendations."),
+  chartData: z.array(z.object({
+      name: z.string().describe("The name of the 7-S element."),
+      score: z.number().min(0).max(100).describe("An alignment score from 0 (poor) to 100 (excellent)."),
+  })).describe("Data for the alignment radar chart.")
 });
 export type Generate7SAnalysisOutput = z.infer<typeof Generate7SAnalysisOutputSchema>;
 
@@ -34,21 +42,39 @@ const prompt = ai.definePrompt({
   name: 'generate7SAnalysisPrompt',
   input: {schema: Generate7SAnalysisInputSchema},
   output: {schema: Generate7SAnalysisOutputSchema},
-  prompt: `You are a management consultant specializing in organizational alignment using the McKinsey 7-S framework.
+  prompt: `You are a world-class management consultant specializing in organizational transformation using the McKinsey 7-S framework. Your analysis is not just descriptive, but prescriptive and insightful, designed to catalyze significant positive change within a company.
 
-You will be provided with descriptions of each of the seven elements of the framework: Strategy, Structure, Systems, Shared Values, Style, Staff, and Skills.
+You will be provided with descriptions of each of the seven elements: Strategy, Structure, Systems, Shared Values, Style, Staff, and Skills.
 
-Your task is to analyze the alignment between these elements and provide a concise analysis, formatted in markdown, identifying potential areas for improvement within the organization.
+Your multi-part task is to:
 
-Strategy: {{{strategy}}}
-Structure: {{{structure}}}
-Systems: {{{systems}}}
-Shared Values: {{{sharedValues}}}
-Style: {{{style}}}
-Staff: {{{staff}}}
-Skills: {{{skills}}}
+1.  **Generate an In-depth Analysis:**
+    *   Analyze the alignment (or misalignment) between all seven elements.
+    *   Identify the core strengths and critical weaknesses.
+    *   Pinpoint the root causes of any identified issues.
+    *   The analysis should be comprehensive, insightful, and formatted in clear markdown.
 
-Analyze the alignment between these elements and provide a concise analysis in markdown, identifying potential areas for improvement within the organization.
+2.  **Create Actionable Recommendations:**
+    *   Provide a list of at least three specific, concrete, and actionable recommendations.
+    *   For each recommendation, assign a priority level: "High", "Medium", or "Low". High-priority items should address the most critical misalignments that will unlock the most value.
+
+3.  **Produce Alignment Scores for a Radar Chart:**
+    *   For each of the seven elements, provide an "alignment score" from 0 to 100.
+    *   A score of 100 represents perfect alignment with all other elements.
+    *   A score of 0 represents a complete lack of alignment.
+    *   The scores should be a thoughtful, relative measure based on the provided descriptions. For example, if the 'Strategy' is aggressive growth but the 'Skills' are outdated, the 'Skills' element would have a very low score, and the 'Strategy' might have a medium score because it's not supported by the team's capabilities.
+
+**User-Provided Information:**
+
+*   **Strategy:** {{{strategy}}}
+*   **Structure:** {{{structure}}}
+*   **Systems:** {{{systems}}}
+*   **Shared Values:** {{{sharedValues}}}
+*   **Style:** {{{style}}}
+*   **Staff:** {{{staff}}}
+*   **Skills:** {{{skills}}}
+
+Return your response in the required JSON format, with fields for "analysis", "recommendations", and "chartData".
 `,
 });
 

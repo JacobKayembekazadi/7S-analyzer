@@ -1,3 +1,5 @@
+import { z } from "zod";
+
 export type SevenSElements = {
   strategy: string;
   structure: string;
