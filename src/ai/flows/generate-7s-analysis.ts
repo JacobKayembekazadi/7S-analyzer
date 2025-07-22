@@ -21,12 +21,15 @@ const Generate7SAnalysisInputSchema = z.object({
 });
 export type Generate7SAnalysisInput = z.infer<typeof Generate7SAnalysisInputSchema>;
 
-const Generate7SAnalysisOutputSchema = z.object({
-  analysis: z.string().describe('AI-generated analysis of the alignment between the seven elements, in markdown format.'),
-  recommendations: z.array(z.object({
+const RecommendationSchema = z.object({
     recommendation: z.string().describe("A specific, actionable recommendation for improvement."),
     priority: z.enum(["High", "Medium", "Low"]).describe("The priority of the recommendation."),
-  })).describe("A list of actionable recommendations."),
+  });
+export type Recommendation = z.infer<typeof RecommendationSchema>;
+
+const Generate7SAnalysisOutputSchema = z.object({
+  analysis: z.string().describe('AI-generated analysis of the alignment between the seven elements, in markdown format.'),
+  recommendations: z.array(RecommendationSchema).describe("A list of actionable recommendations."),
   chartData: z.array(z.object({
       name: z.string().describe("The name of the 7-S element."),
       score: z.number().min(0).max(100).describe("An alignment score from 0 (poor) to 100 (excellent)."),

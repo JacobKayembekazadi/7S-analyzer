@@ -1,14 +1,14 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Award, Info, Lightbulb, ListChecks, Loader2, Mic, Sparkles, Target, Shield, Skull, Telescope, Wind } from "lucide-react";
+import { Award, Info, Lightbulb, ListChecks, Loader2, Sparkles, Target, Shield, Skull, Telescope, Wind, PlusCircle, Trash2 } from "lucide-react";
 import { useState } from "react";
-import { useForm } from "react-hook-form";
+import { useForm, useFieldArray } from "react-hook-form";
 import { z } from "zod";
 import { PolarAngleAxis, PolarGrid, Radar, RadarChart } from "recharts";
 
 
-import { generateAnalysis, getTemplate, refineAnalysis, generateSwotAnalysis, generateTownHallSpeech } from "@/app/actions";
+import { generateAnalysis, getTemplate, refineAnalysis, generateSwotAnalysis } from "@/app/actions";
 import { Markdown } from "@/components/markdown";
 import {
   Accordion,
@@ -52,10 +52,10 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { useToast } from "@/hooks/use-toast";
-import type { Generate7SAnalysisOutput } from "@/ai/flows/generate-7s-analysis";
-import type { GenerateTownHallSpeechOutput } from "@/ai/flows/generate-town-hall";
+import type { Generate7SAnalysisOutput, Recommendation } from "@/ai/flows/generate-7s-analysis";
 import type { SevenSElements, SwotElements } from "@/lib/types";
 import { GenerateSwotAnalysisOutput } from "@/ai/flows/generate-swot-analysis";
+import { Checkbox } from "@/components/ui/checkbox";
 
 const sevenSFormSchema = z.object({
   strategy: z.string().min(1, "Strategy description is required."),
@@ -72,7 +72,21 @@ const swotFormSchema = z.object({
   weaknesses: z.string().min(1, "Weaknesses description is required."),
   opportunities: z.string().min(1, "Opportunities description is required."),
   threats: z.string().min(1, "Threats description is required."),
-})
+});
+
+const actionPlanSchema = z.object({
+  goals: z.array(z.object({
+    id: z.string(),
+    title: z.string().min(1, "Goal title is required."),
+    priority: z.enum(["High", "Medium", "Low"]),
+    actions: z.array(z.object({
+      id: z.string(),
+      task: z.string().min(1, "Task description is required."),
+      completed: z.boolean(),
+    })),
+  })),
+});
+
 
 const S_ELEMENTS: {
   key: keyof SevenSElements;
@@ -104,36 +118,62 @@ const SWOT_ELEMENTS: {
 export default function Home() {
   const [analysisResult, setAnalysisResult] = useState<Generate7SAnalysisOutput | null>(null);
   const [swotResult, setSwotResult] = useState<GenerateSwotAnalysisOutput | null>(null);
-  const [townHallSpeech, setTownHallSpeech] = useState<GenerateTownHallSpeechOutput | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isRefining, setIsRefining] = useState(false);
-  const [isGeneratingSpeech, setIsGeneratingSpeech] = useState(false);
   const [feedback, setFeedback] = useState("");
-  const [companyName, setCompanyName] = useState("");
   const { toast } = useToast();
 
   const sevenSForm = useForm<z.infer<typeof sevenSFormSchema>>({
     resolver: zodResolver(sevenSFormSchema),
     defaultValues: {
-      strategy: "",
-      structure: "",
-      systems: "",
-      sharedValues: "",
-      style: "",
-      staff: "",
-      skills: "",
+      strategy: "", structure: "", systems: "",
+      sharedValues: "", style: "", staff: "", skills: "",
     },
   });
 
   const swotForm = useForm<z.infer<typeof swotFormSchema>>({
     resolver: zodResolver(swotFormSchema),
     defaultValues: {
-      strengths: "",
-      weaknesses: "",
-      opportunities: "",
-      threats: "",
+      strengths: "", weaknesses: "", opportunities: "", threats: "",
     },
   });
+
+  const actionPlanForm = useForm<z.infer<typeof actionPlanSchema>>({
+    resolver: zodResolver(actionPlanSchema),
+    defaultValues: {
+      goals: [],
+    },
+  });
+
+  const { fields: goalFields, append: appendGoal, remove: removeGoal, update: updateGoal } = useFieldArray({
+    control: actionPlanForm.control,
+    name: "goals",
+  });
+
+  const addRecommendationAsGoal = (rec: Recommendation) => {
+    appendGoal({
+      id: `goal_${Date.now()}`,
+      title: rec.recommendation,
+      priority: rec.priority,
+      actions: [{ id: `action_${Date.now()}`, task: "", completed: false }],
+    });
+     toast({
+        title: "Goal Added",
+        description: `"${rec.recommendation}" has been added to your action plan.`,
+      });
+  };
+  
+  const addActionItem = (goalIndex: number) => {
+    const newAction = { id: `action_${Date.now()}`, task: "", completed: false };
+    const goal = actionPlanForm.getValues(`goals.${goalIndex}`);
+    updateGoal(goalIndex, { ...goal, actions: [...goal.actions, newAction] });
+  };
+  
+  const removeActionItem = (goalIndex: number, actionIndex: number) => {
+     const goal = actionPlanForm.getValues(`goals.${goalIndex}`);
+     const newActions = goal.actions.filter((_, i) => i !== actionIndex);
+     updateGoal(goalIndex, { ...goal, actions: newActions });
+  };
 
 
   const handleTemplateChange = async (templateName: string) => {
@@ -159,7 +199,7 @@ export default function Home() {
     setIsLoading(true);
     setAnalysisResult(null);
     setSwotResult(null);
-    setTownHallSpeech(null);
+    actionPlanForm.reset({ goals: [] });
     try {
       const result = await generateAnalysis(values);
       setAnalysisResult(result);
@@ -179,7 +219,7 @@ export default function Home() {
     setIsLoading(true);
     setSwotResult(null);
     setAnalysisResult(null);
-    setTownHallSpeech(null);
+    actionPlanForm.reset({ goals: [] });
     try {
       const result = await generateSwotAnalysis(values);
       setSwotResult(result);
@@ -218,33 +258,6 @@ export default function Home() {
     }
   };
   
-  const handleGenerateSpeech = async () => {
-    if (!swotResult || !companyName) {
-       toast({
-        variant: "destructive",
-        title: "Missing Information",
-        description: "Please enter a company name before generating a speech.",
-      });
-      return;
-    };
-    setIsGeneratingSpeech(true);
-    try {
-      const result = await generateTownHallSpeech({
-        analysis: swotResult.analysis,
-        companyName: companyName,
-      });
-      setTownHallSpeech(result);
-    } catch (error) {
-       toast({
-        variant: "destructive",
-        title: "Speech Generation Failed",
-        description: "The AI could not generate the speech. Please try again.",
-      });
-    } finally {
-      setIsGeneratingSpeech(false);
-    }
-  };
-
   const priorityIcon = (priority: 'High' | 'Medium' | 'Low') => {
     switch (priority) {
       case 'High': return <Target className="text-red-500" />;
@@ -263,7 +276,7 @@ export default function Home() {
             <header className="mb-8">
               <h1 className="font-headline text-4xl font-bold tracking-tight text-foreground">Strategic Alignment OS</h1>
               <p className="mt-2 text-lg text-muted-foreground">
-                Transform your organization with AI-driven insights.
+                From insight to action. Transform your organization with an integrated strategic toolkit.
               </p>
             </header>
 
@@ -434,34 +447,115 @@ export default function Home() {
                     </div>
                   </div>
                 ) : analysisResult ? (
-                  <Tabs defaultValue="recommendations" className="w-full">
+                  <Tabs defaultValue="actions" className="w-full">
                     <TabsList className="grid w-full grid-cols-3">
-                      <TabsTrigger value="recommendations">7-S Recommendations</TabsTrigger>
-                      <TabsTrigger value="analysis">7-S Full Analysis</TabsTrigger>
-                      <TabsTrigger value="chart">7-S Alignment Chart</TabsTrigger>
+                       <TabsTrigger value="actions">Goals &amp; Actions</TabsTrigger>
+                       <TabsTrigger value="analysis">7-S Full Analysis</TabsTrigger>
+                       <TabsTrigger value="chart">7-S Alignment Chart</TabsTrigger>
                     </TabsList>
-                    <TabsContent value="recommendations" className="mt-6">
-                      <div className="space-y-4">
-                        {analysisResult.recommendations.map((rec, index) => (
-                          <Card key={index} className="bg-background/50">
-                            <CardHeader className="flex flex-row items-start gap-4 space-y-0 p-4">
-                              <div className="mt-1">{priorityIcon(rec.priority)}</div>
-                              <div>
-                                <div className="flex items-center gap-2">
-                                  <p className="font-semibold">{rec.recommendation}</p>
-                                </div>
-                                <Badge variant={rec.priority === 'High' ? 'destructive' : 'secondary'} className="mt-2">{rec.priority} Priority</Badge>
-                              </div>
-                            </CardHeader>
-                          </Card>
-                        ))}
-                      </div>
+                    
+                     <TabsContent value="actions" className="mt-6">
+                      <Card>
+                        <CardHeader>
+                            <CardTitle>Recommended Goals</CardTitle>
+                            <CardDescription>Click to add a recommendation to your action plan.</CardDescription>
+                        </CardHeader>
+                        <CardContent className="space-y-2">
+                           {analysisResult.recommendations.map((rec, index) => (
+                            <div key={index} className="flex items-center justify-between rounded-md border p-2 bg-background/50">
+                               <div className="flex items-center gap-3">
+                                  {priorityIcon(rec.priority)}
+                                  <span className="text-sm font-medium">{rec.recommendation}</span>
+                                  <Badge variant={rec.priority === 'High' ? 'destructive' : 'secondary'} className="hidden sm:inline-flex">{rec.priority}</Badge>
+                               </div>
+                               <Button variant="ghost" size="icon" onClick={() => addRecommendationAsGoal(rec)}>
+                                  <PlusCircle className="h-5 w-5 text-primary" />
+                               </Button>
+                            </div>
+                           ))}
+                        </CardContent>
+                      </Card>
+
+                       <Form {...actionPlanForm}>
+                        <form>
+                          {goalFields.length > 0 && <h3 className="text-xl font-bold mt-6 mb-4">Your Action Plan</h3>}
+                          <div className="space-y-6">
+                            {goalFields.map((goal, goalIndex) => (
+                              <Card key={goal.id} className="bg-background/80">
+                                <CardHeader>
+                                  <div className="flex justify-between items-start">
+                                    <FormField
+                                        control={actionPlanForm.control}
+                                        name={`goals.${goalIndex}.title`}
+                                        render={({ field }) => (
+                                          <Input {...field} className="text-lg font-semibold border-none shadow-none p-0 focus-visible:ring-0" />
+                                        )}
+                                      />
+                                    <Button variant="ghost" size="icon" onClick={() => removeGoal(goalIndex)}>
+                                      <Trash2 className="h-4 w-4 text-muted-foreground" />
+                                    </Button>
+                                  </div>
+                                  <Badge variant={goal.priority === 'High' ? 'destructive' : 'secondary'} className="w-min">{goal.priority} Priority</Badge>
+                                </CardHeader>
+                                <CardContent className="space-y-3">
+                                  {goal.actions.map((action, actionIndex) => (
+                                    <div key={action.id} className="flex items-center gap-2">
+                                      <FormField
+                                        control={actionPlanForm.control}
+                                        name={`goals.${goalIndex}.actions.${actionIndex}.completed`}
+                                        render={({ field }) => (
+                                          <Checkbox checked={field.value} onCheckedChange={field.onChange} />
+                                        )}
+                                      />
+                                      <FormField
+                                        control={actionPlanForm.control}
+                                        name={`goals.${goalIndex}.actions.${actionIndex}.task`}
+                                        render={({ field }) => (
+                                          <Input {...field} placeholder="Describe the action item..." className="flex-grow" />
+                                        )}
+                                      />
+                                      <Button variant="ghost" size="icon" onClick={() => removeActionItem(goalIndex, actionIndex)}>
+                                        <Trash2 className="h-4 w-4 text-muted-foreground" />
+                                      </Button>
+                                    </div>
+                                  ))}
+                                   <Button type="button" variant="outline" size="sm" onClick={() => addActionItem(goalIndex)}>
+                                      <PlusCircle className="mr-2 h-4 w-4" /> Add Action Item
+                                   </Button>
+                                </CardContent>
+                              </Card>
+                            ))}
+                          </div>
+                        </form>
+                       </Form>
                     </TabsContent>
+
                     <TabsContent value="analysis" className="mt-4">
                       <div className="prose prose-sm max-w-none rounded-md border bg-background/50 p-4 max-h-[450px] overflow-y-auto">
                         <Markdown content={analysisResult.analysis} />
                       </div>
+                       <div className="mt-6 border-t pt-6">
+                        <h3 className="text-lg font-semibold mb-2">Refine Analysis</h3>
+                        <Textarea
+                          placeholder="Provide feedback to improve the analysis. For example, 'Focus more on the disconnect between strategy and skills.'"
+                          value={feedback}
+                          onChange={(e) => setFeedback(e.target.value)}
+                          className="min-h-[100px] bg-card mb-2"
+                          disabled={isRefining}
+                        />
+                        <Button onClick={handleRefine} disabled={isRefining || !feedback}>
+                          {isRefining ? (
+                            <>
+                              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                              Refining...
+                            </>
+                          ) : (
+                            "Refine with Feedback"
+                          )}
+                        </Button>
+                      </div>
                     </TabsContent>
+                    
                     <TabsContent value="chart" className="mt-4">
                       <ChartContainer
                         config={{
@@ -485,71 +579,18 @@ export default function Home() {
                         </RadarChart>
                       </ChartContainer>
                     </TabsContent>
-                    <div className="mt-6 border-t pt-6">
-                      <h3 className="text-lg font-semibold mb-2">Refine Analysis</h3>
-                      <Textarea
-                        placeholder="Provide feedback to improve the analysis. For example, 'Focus more on the disconnect between strategy and skills.'"
-                        value={feedback}
-                        onChange={(e) => setFeedback(e.target.value)}
-                        className="min-h-[100px] bg-card mb-2"
-                        disabled={isRefining}
-                      />
-                      <Button onClick={handleRefine} disabled={isRefining || !feedback}>
-                        {isRefining ? (
-                          <>
-                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                            Refining...
-                          </>
-                        ) : (
-                          "Refine with Feedback"
-                        )}
-                      </Button>
-                    </div>
+
                   </Tabs>
                 ) : swotResult ? (
                   <Tabs defaultValue="swot-analysis" className="w-full">
-                    <TabsList className="grid w-full grid-cols-2">
+                    <TabsList className="grid w-full grid-cols-1">
                       <TabsTrigger value="swot-analysis">SWOT Analysis</TabsTrigger>
-                      {townHallSpeech && <TabsTrigger value="town-hall">Town Hall Speech</TabsTrigger>}
                     </TabsList>
                     <TabsContent value="swot-analysis" className="mt-4">
                        <div className="prose prose-sm max-w-none rounded-md border bg-background/50 p-4 max-h-[550px] overflow-y-auto">
                           <Markdown content={swotResult.analysis} />
                       </div>
-                       <Card className="mt-6">
-                        <CardHeader>
-                          <CardTitle className="flex items-center gap-2"><Mic /> Generate Town Hall Speech</CardTitle>
-                          <CardDescription>
-                            Turn this SWOT analysis into a compelling speech for your team. Enter your company name to begin.
-                          </CardDescription>
-                        </CardHeader>
-                        <CardContent className="flex flex-col gap-4">
-                           <Input 
-                            placeholder="Your Company Name"
-                            value={companyName}
-                            onChange={(e) => setCompanyName(e.target.value)}
-                            disabled={isGeneratingSpeech}
-                          />
-                          <Button onClick={handleGenerateSpeech} disabled={isGeneratingSpeech || !companyName}>
-                            {isGeneratingSpeech ? (
-                              <>
-                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                Generating...
-                              </>
-                            ) : (
-                              "Generate Speech"
-                            )}
-                          </Button>
-                        </CardContent>
-                      </Card>
                     </TabsContent>
-                     {townHallSpeech && (
-                      <TabsContent value="town-hall" className="mt-4">
-                         <div className="prose prose-sm max-w-none rounded-md border bg-background/50 p-4 max-h-[550px] overflow-y-auto">
-                            <Markdown content={townHallSpeech.speech} />
-                        </div>
-                      </TabsContent>
-                    )}
                   </Tabs>
                 ) : (
                   <div className="flex h-full min-h-[400px] flex-col items-center justify-center rounded-md border-2 border-dashed bg-muted/50 p-8 text-center">
